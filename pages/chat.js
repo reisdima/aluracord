@@ -1,10 +1,54 @@
 import { Box, Text, TextField, Image, Button } from '@skynexui/components';
 import React from 'react';
 import appConfig from '../config.json';
+import { createClient } from '@supabase/supabase-js'
+import { useRouter } from 'next/router'
+import { ButtonSendSticker } from '../src/components/ButtonSendSticker'
+
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlhdCI6MTY0MzQ5NjIwNSwiZXhwIjoxOTU5MDcyMjA1fQ.61S4I05JhpLECL57vjYZtolgbMiQv4VUIbhDxotaPT4"
+const SUPABASE_URL = "https://nbpegmdxwohcdrtyhswv.supabase.co"
+const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+function escutaMensagensEmTempoReal(adicionaMensagem) {
+    return supabaseClient.from('mensagens')
+        .on('INSERT', (response) => {
+            adicionaMensagem(response.new);
+        })
+        .subscribe();
+}
+
 
 export default function ChatPage() {
+    const roteamento = useRouter();
+    const usuarioLogado = roteamento.query.username;
     const [mensagem, setMensagem] = React.useState('');
-    const [listaDeMensagens, setListaDeMensagens] = React.useState([]);
+    const [listaDeMensagens, setListaDeMensagens] = React.useState([
+        // {
+        //     id: 1,
+        //     de: 'reisdima',
+        //     texto: ':sticker: https://www.alura.com.br/imersao-react-4/assets/figurinhas/Figurinha_9.png'
+        // },
+        // {
+        //     id: 2,
+        //     de: 'reisdima',
+        //     texto: 'Menasgem normal'
+        // }
+    ]);
+
+    React.useEffect(() => {
+        supabaseClient.from('mensagens')
+            .select('*')
+            .order('id', { ascending: false })
+            .then(({ data }) => {
+                setListaDeMensagens(data)
+            });
+        escutaMensagensEmTempoReal((novaMensagem) => {
+            setListaDeMensagens((valorAtualDaLista) => {
+                // console.log("Nova mensagem :", novaMensagem);
+                return [novaMensagem, ...valorAtualDaLista]
+            });
+        });
+    }, []);
 
     /*
     // Usuário
@@ -20,11 +64,15 @@ export default function ChatPage() {
 
     function handleNovaMensagem(novaMensagem) {
         const mensagem = {
-            id: listaDeMensagens.length,
-            de: 'caio',
+            // id: listaDeMensagens.length,
+            de: usuarioLogado,
             texto: novaMensagem
         }
-        setListaDeMensagens([mensagem, ...listaDeMensagens]);
+        supabaseClient.from('mensagens')
+            .insert([
+                mensagem
+            ])
+            .then(({ data }) => { });
         setMensagem('');
     }
 
@@ -105,6 +153,10 @@ export default function ChatPage() {
                                 marginRight: '12px',
                                 color: appConfig.theme.colors.neutrals[200],
                             }}
+                        />
+                        <ButtonSendSticker onStickerClick={(sticker) => {
+                            handleNovaMensagem(':sticker: ' + sticker)
+                        }}
                         />
                     </Box>
                 </Box>
@@ -187,7 +239,10 @@ function MessageList(props) {
                                 {(new Date().toLocaleDateString())}
                             </Text>
                         </Box>
-                        {mensagem.texto}
+                        {mensagem.texto.startsWith(':sticker:') ?
+                            (<Image src={mensagem.texto.replace(':sticker:', '')} />)
+                            : (mensagem.texto)
+                        }
                     </Text>
                 );
             })}
